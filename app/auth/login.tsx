@@ -1,82 +1,216 @@
-import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../../services/supabase';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { supabase } from '../../lib/supabase';
 
-export default function LoginScreen() {
-  const router = useRouter();
+export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  async function handleLogin() {
-    setErrorText('');
-    if (!email || !email.includes('@')) {
-      setErrorText('Please enter a valid email address.');
+  const handleSendOTP = async () => {
+    // Basic validation
+    const cleanedEmail = email.trim().toLowerCase();
+    if (!cleanedEmail || !cleanedEmail.includes('@')) {
+      setErrorMsg('Please enter a valid email address');
       return;
     }
 
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
     try {
-      setLoading(true);
-      
-      // Request 6-digit passcode directly from Supabase
+      // 1. Request the One-Time Password / Magic Token from Supabase
       const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          shouldCreateUser: true,
-        }
+        email: cleanedEmail,
       });
 
       if (error) throw error;
 
-      // FIXED: No Alert block. Jump INSTANTLY to the OTP entry screen space!
-      router.push('/auth/otp');
+      // 2. CRITICAL: Save the exact email to local device memory
+      await AsyncStorage.setItem('user_testing_email', cleanedEmail);
+
+      setSuccessMsg('Verification code sent successfully!');
+      
+      // 3. Move forward to the OTP validation screen immediately
+      setTimeout(() => {
+        navigation.navigate('otp', { email: cleanedEmail });
+      }, 800);
 
     } catch (error: any) {
-      console.error(error);
-      setErrorText(error.message || 'Could not dispatch OTP.');
+      setErrorMsg(error.message || 'Failed to send verification code. Try again.');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.logo}>⚡ QuickCourt</Text>
-      <Text style={styles.title}>Welcome Back</Text>
-      <Text style={styles.subtitle}>Enter your email to receive an instant database login token</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer} bounces={false}>
+        <View style={styles.card}>
+          {/* Brand/App Title */}
+          <Text style={styles.brandTitle}>QuickCourt AI</Text>
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>Enter your email to receive a secure 6-digit login code</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="name@example.com"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        editable={!loading}
-      />
+          {/* Feedback Messages */}
+          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+          {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
 
-      {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
+          {/* Email Input Field Box */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Email Address</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="name@example.com"
+              placeholderTextColor="#64748b"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={email}
+              onChangeText={(text) => setEmail(text)}
+              editable={!loading}
+            />
+          </View>
 
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.disabledButton]} 
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Send Verification Token</Text>}
-      </TouchableOpacity>
-    </View>
+          {/* Action Trigger Button */}
+          <TouchableOpacity
+            style={[styles.loginButton, loading && styles.disabledButton]}
+            onPress={handleSendOTP}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <Text style={styles.loginButtonText}>Send Verification Code</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: '#fff', justifyContent: 'center' },
-  logo: { fontSize: 28, fontWeight: 'bold', color: '#1e3a8a', textAlign: 'center', marginBottom: 10 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#111827', textAlign: 'center' },
-  subtitle: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 32, paddingHorizontal: 10 },
-  input: { borderWidth: 1, borderColor: '#d1d5db', padding: 16, borderRadius: 8, fontSize: 16, marginBottom: 16, backgroundColor: '#f9fafb' },
-  errorText: { color: '#ef4444', fontSize: 14, textAlign: 'center', marginBottom: 12, fontWeight: '500' },
-  button: { backgroundColor: '#1e3a8a', padding: 16, borderRadius: 8, alignItems: 'center' },
-  disabledButton: { backgroundColor: '#93c5fd' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  container: {
+    flex: 1,
+    backgroundColor: '#0f172a', // Deep midnight background
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  card: {
+    backgroundColor: '#1e293b', // Lighter container gray box layer
+    borderRadius: 16,
+    padding: 28,
+    borderWidth: 1,
+    borderColor: '#334155',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  brandTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#10b981', // Emerald identity accent
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff', // Clean white primary text
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#cbd5e1', // High contrast body font styling
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 28,
+  },
+  errorText: {
+    color: '#f87171',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+    fontWeight: '600',
+    backgroundColor: '#450a0a',
+    padding: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  successText: {
+    color: '#34d399',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+    fontWeight: '600',
+    backgroundColor: '#064e3b',
+    padding: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  inputContainer: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  input: {
+    backgroundColor: '#0f172a', // Clean slate embedded block
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#ffffff', // Ensures user input is perfectly legible
+    borderWidth: 2,
+    borderColor: '#475569',
+  },
+  loginButton: {
+    backgroundColor: '#10b981', // Crisp Emerald Green CTA button
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    marginTop: 8,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
 });

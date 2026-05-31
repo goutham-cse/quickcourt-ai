@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,17 +13,37 @@ import {
 import { supabase } from '../../lib/supabase';
 
 export default function VerificationScreen({ route, navigation }: any) {
-  // 1. Recover the route email string parsed from your Login/Signup layout screen
-  // Fallback testing string placeholder email provided below
-  const email = route?.params?.email || 'testuser@example.com';
-
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(30);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Standard 30-second ticking loop for spam prevention
+  // 1. Load the real email instantly from local memory or route params
+  useEffect(() => {
+    const resolveEmail = async () => {
+      let foundEmail = route?.params?.email;
+      
+      if (!foundEmail) {
+        // Fallback to local device storage memory if navigation route dropped it
+        foundEmail = await AsyncStorage.getItem('user_testing_email');
+      } else {
+        // Save it for backup safety
+        await AsyncStorage.setItem('user_testing_email', foundEmail);
+      }
+
+      if (foundEmail) {
+        setEmail(foundEmail.trim().toLowerCase());
+      } else {
+        setErrorMsg('Email missing. Please go back to the login screen.');
+      }
+    };
+
+    resolveEmail();
+  }, [route?.params?.email]);
+
+  // Countdown timer loop
   useEffect(() => {
     let interval: any;
     if (resendTimer > 0) {
@@ -33,10 +54,14 @@ export default function VerificationScreen({ route, navigation }: any) {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  // Submit token to Supabase under the strict email type channel
+  // Verify Code Process
   const handleVerifyOTP = async () => {
     if (otp.length < 6) {
-      setErrorMsg('Please enter the complete 6-digit verification code');
+      setErrorMsg('Please enter the complete 6-digit code');
+      return;
+    }
+    if (!email) {
+      setErrorMsg('Cannot verify: Email address is unknown.');
       return;
     }
 
@@ -45,26 +70,27 @@ export default function VerificationScreen({ route, navigation }: any) {
     setSuccessMsg('');
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         email: email,
         token: otp,
-        type: 'email', // Core change: Switches logic to check email records
+        type: 'email',
       });
 
       if (error) throw error;
       
-      // Successfully authenticated -> route straight into the app dashboard layers
+      // Success! Clear memory backup and go to app tabs
+      await AsyncStorage.removeItem('user_testing_email');
       navigation.replace('(tabs)');
     } catch (error: any) {
-      setErrorMsg(error.message || 'Invalid or expired OTP. Please request a new one.');
+      setErrorMsg(error.message || 'Invalid or expired code. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Re-fire a fresh passwordless OTP directly to the user's email address
+  // Resend Code Process
   const handleResendOTP = async () => {
-    if (resendTimer > 0) return;
+    if (resendTimer > 0 || !email) return;
     
     setErrorMsg('');
     setSuccessMsg('');
@@ -78,10 +104,10 @@ export default function VerificationScreen({ route, navigation }: any) {
 
       if (error) throw error;
       
-      setSuccessMsg('A brand new verification code has been dispatched to your inbox!');
-      setResendTimer(30); // Reactivate standard user cooldown tracker state
+      setSuccessMsg('A new 6-digit code has been sent to your email!');
+      setResendTimer(30); 
     } catch (error: any) {
-      setErrorMsg(error.message || 'Unable to resend token. Please try again later.');
+      setErrorMsg(error.message || 'Failed to resend. Please check connection.');
     } finally {
       setLoading(false);
     }
@@ -94,13 +120,12 @@ export default function VerificationScreen({ route, navigation }: any) {
     >
       <View style={styles.card}>
         <Text style={styles.title}>Verify Your Email</Text>
-        <Text style={styles.subtitle}>We emailed a 6-digit secure login token to:</Text>
-        <Text style={styles.emailHighlight}>{email}</Text>
+        <Text style={styles.subtitle}>We sent a secure 6-digit login token to:</Text>
+        <Text style={styles.emailHighlight}>{email || 'Loading email...'}</Text>
 
         {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
         {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
 
-        {/* Crisp Centralized Input Frame */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Enter 6-Digit OTP</Text>
           <TextInput
@@ -114,11 +139,10 @@ export default function VerificationScreen({ route, navigation }: any) {
           />
         </View>
 
-        {/* Verification Trigger Button */}
         <TouchableOpacity 
-          style={[styles.verifyButton, loading && styles.disabledButton]} 
+          style={[styles.verifyButton, (loading || !email) && styles.disabledButton]} 
           onPress={handleVerifyOTP}
-          disabled={loading}
+          disabled={loading || !email}
           activeOpacity={0.8}
         >
           {loading ? (
@@ -128,14 +152,13 @@ export default function VerificationScreen({ route, navigation }: any) {
           )}
         </TouchableOpacity>
 
-        {/* Resend Actions Interface */}
         <View style={styles.resendContainer}>
           {resendTimer > 0 ? (
             <Text style={styles.resendDisabledText}>
               Resend code in <Text style={styles.timerHighlight}>{resendTimer}s</Text>
             </Text>
           ) : (
-            <TouchableOpacity onPress={handleResendOTP} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <TouchableOpacity onPress={handleResendOTP} disabled={!email}>
               <Text style={styles.resendActiveText}>Resend OTP</Text>
             </TouchableOpacity>
           )}
@@ -146,121 +169,21 @@ export default function VerificationScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a', 
-    justifyContent: 'center',
-    padding: 24,
-  },
-  card: {
-    backgroundColor: '#1e293b', 
-    borderRadius: 16,
-    padding: 28,
-    borderWidth: 1,
-    borderColor: '#334155', 
-    elevation: 4,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#ffffff', 
-    marginBottom: 6,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#cbd5e1', 
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emailHighlight: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#38bdf8', 
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 24,
-  },
-  errorText: {
-    color: '#f87171', 
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 16,
-    fontWeight: '600',
-    backgroundColor: '#450a0a', 
-    padding: 10,
-    borderRadius: 8,
-  },
-  successText: {
-    color: '#34d399', 
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 16,
-    fontWeight: '600',
-    backgroundColor: '#064e3b', 
-    padding: 10,
-    borderRadius: 8,
-  },
-  inputContainer: {
-    marginBottom: 24,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#94a3b8', 
-    textTransform: 'uppercase',
-    marginBottom: 10,
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  input: {
-    backgroundColor: '#0f172a', 
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 24, 
-    fontWeight: '700',
-    color: '#ffffff', 
-    textAlign: 'center',
-    letterSpacing: 6, 
-    borderWidth: 2,
-    borderColor: '#475569', 
-  },
-  verifyButton: {
-    backgroundColor: '#10b981', 
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 3,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  verifyButtonText: {
-    color: '#ffffff', 
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  resendContainer: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  resendDisabledText: {
-    color: '#94a3b8', 
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  timerHighlight: {
-    color: '#f59e0b', 
-    fontWeight: '700',
-  },
-  resendActiveText: {
-    color: '#10b981', 
-    fontSize: 15,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
+  container: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', padding: 24 },
+  card: { backgroundColor: '#1e293b', borderRadius: 16, padding: 28, borderWidth: 1, borderColor: '#334155', elevation: 4 },
+  title: { fontSize: 26, fontWeight: '800', color: '#ffffff', marginBottom: 6, textAlign: 'center' },
+  subtitle: { fontSize: 14, color: '#cbd5e1', textAlign: 'center', lineHeight: 20 },
+  emailHighlight: { fontSize: 15, fontWeight: '700', color: '#38bdf8', textAlign: 'center', marginTop: 4, marginBottom: 24 },
+  errorText: { color: '#f87171', fontSize: 14, textAlign: 'center', marginBottom: 16, fontWeight: '600', backgroundColor: '#450a0a', padding: 10, borderRadius: 8 },
+  successText: { color: '#34d399', fontSize: 14, textAlign: 'center', marginBottom: 16, fontWeight: '600', backgroundColor: '#064e3b', padding: 10, borderRadius: 8 },
+  inputContainer: { marginBottom: 24 },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 10, textAlign: 'center' },
+  input: { backgroundColor: '#0f172a', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16, fontSize: 24, fontWeight: '700', color: '#ffffff', textAlign: 'center', letterSpacing: 6, borderWidth: 2, borderColor: '#475569' },
+  verifyButton: { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', elevation: 3 },
+  disabledButton: { opacity: 0.5 },
+  verifyButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
+  resendContainer: { marginTop: 24, alignItems: 'center' },
+  resendDisabledText: { color: '#94a3b8', fontSize: 14, fontWeight: '500' },
+  timerHighlight: { color: '#f59e0b', fontWeight: '700' },
+  resendActiveText: { color: '#10b981', fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
 });
