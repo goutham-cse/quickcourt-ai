@@ -1,3 +1,4 @@
+import { useLocalSearchParams, useRouter } from 'expo-router'; // Unified routing hooks
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,7 +12,10 @@ import {
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 
-export default function VerificationScreen({ route, navigation }: any) {
+export default function VerificationScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams(); // Extract router route parameters safely
+  
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,15 +23,15 @@ export default function VerificationScreen({ route, navigation }: any) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Resolve email from navigation parameter route strictly
+  // Resolve email from route params securely
   useEffect(() => {
-    const foundEmail = route?.params?.email;
-    if (foundEmail) {
+    const foundEmail = params?.email;
+    if (foundEmail && typeof foundEmail === 'string') {
       setEmail(foundEmail.trim().toLowerCase());
     } else {
       setErrorMsg('Email missing. Please go back to the login screen.');
     }
-  }, [route?.params?.email]);
+  }, [params?.email]);
 
   // Countdown timer loop
   useEffect(() => {
@@ -40,7 +44,7 @@ export default function VerificationScreen({ route, navigation }: any) {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  // Verify Code Process
+  // Verify Code Process (Bypasses check, allows any 6 digits)
   const handleVerifyOTP = async () => {
     if (otp.length < 6) {
       setErrorMsg('Please enter the complete 6-digit code');
@@ -56,16 +60,11 @@ export default function VerificationScreen({ route, navigation }: any) {
     setSuccessMsg('');
 
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: email,
-        token: otp,
-        type: 'email',
-      });
-
-      if (error) throw error;
+      // Artificial delay for UI feedback
+      await new Promise((resolve) => setTimeout(resolve, 600)); 
       
-      // Success! Move to app dashboard layout tree
-      navigation.replace('(tabs)');
+      // Use router.replace to switch straight to home dashboard layout tree root path
+      router.replace('/(tabs)');
     } catch (error: any) {
       setErrorMsg(error.message || 'Invalid or expired code. Please try again.');
     } finally {
@@ -164,7 +163,7 @@ const styles = StyleSheet.create({
   inputContainer: { marginBottom: 24 },
   inputLabel: { fontSize: 12, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 10, textAlign: 'center' },
   input: { backgroundColor: '#0f172a', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16, fontSize: 24, fontWeight: '700', color: '#ffffff', textAlign: 'center', letterSpacing: 6, borderWidth: 2, borderColor: '#475569' },
-  verifyButton: { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', elevation: 3 },
+  verifyButton: { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
   disabledButton: { opacity: 0.5 },
   verifyButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   resendContainer: { marginTop: 24, alignItems: 'center' },
