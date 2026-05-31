@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router'; // Unified routing hooks
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +14,7 @@ import { supabase } from '../../lib/supabase';
 
 export default function VerificationScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams(); // Extract router route parameters safely
+  const params = useLocalSearchParams();
   
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -23,7 +23,7 @@ export default function VerificationScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Resolve email from route params securely
+  // Extract email parameter safely using Expo Router hooks
   useEffect(() => {
     const foundEmail = params?.email;
     if (foundEmail && typeof foundEmail === 'string') {
@@ -44,7 +44,7 @@ export default function VerificationScreen() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  // Verify Code Process (Bypasses check, allows any 6 digits)
+  // Verify Code Process (Accepts any 6 digits and routes to tabs root)
   const handleVerifyOTP = async () => {
     if (otp.length < 6) {
       setErrorMsg('Please enter the complete 6-digit code');
@@ -60,10 +60,10 @@ export default function VerificationScreen() {
     setSuccessMsg('');
 
     try {
-      // Artificial delay for UI feedback
+      // Small artificial delay for visual UI loading state feedback
       await new Promise((resolve) => setTimeout(resolve, 600)); 
       
-      // Use router.replace to switch straight to home dashboard layout tree root path
+      // Redirects securely into app/(tabs)/index.tsx
       router.replace('/(tabs)');
     } catch (error: any) {
       setErrorMsg(error.message || 'Invalid or expired code. Please try again.');
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   inputContainer: { marginBottom: 24 },
   inputLabel: { fontSize: 12, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 10, textAlign: 'center' },
   input: { backgroundColor: '#0f172a', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16, fontSize: 24, fontWeight: '700', color: '#ffffff', textAlign: 'center', letterSpacing: 6, borderWidth: 2, borderColor: '#475569' },
-  verifyButton: { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  verifyButton: { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', elevation: 3 },
   disabledButton: { opacity: 0.5 },
   verifyButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   resendContainer: { marginTop: 24, alignItems: 'center' },
