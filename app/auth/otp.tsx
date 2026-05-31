@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,27 +19,14 @@ export default function VerificationScreen({ route, navigation }: any) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // 1. Load the real email instantly from local memory or route params
+  // Resolve email from navigation parameter route strictly
   useEffect(() => {
-    const resolveEmail = async () => {
-      let foundEmail = route?.params?.email;
-      
-      if (!foundEmail) {
-        // Fallback to local device storage memory if navigation route dropped it
-        foundEmail = await AsyncStorage.getItem('user_testing_email');
-      } else {
-        // Save it for backup safety
-        await AsyncStorage.setItem('user_testing_email', foundEmail);
-      }
-
-      if (foundEmail) {
-        setEmail(foundEmail.trim().toLowerCase());
-      } else {
-        setErrorMsg('Email missing. Please go back to the login screen.');
-      }
-    };
-
-    resolveEmail();
+    const foundEmail = route?.params?.email;
+    if (foundEmail) {
+      setEmail(foundEmail.trim().toLowerCase());
+    } else {
+      setErrorMsg('Email missing. Please go back to the login screen.');
+    }
   }, [route?.params?.email]);
 
   // Countdown timer loop
@@ -78,8 +64,7 @@ export default function VerificationScreen({ route, navigation }: any) {
 
       if (error) throw error;
       
-      // Success! Clear memory backup and go to app tabs
-      await AsyncStorage.removeItem('user_testing_email');
+      // Success! Move to app dashboard layout tree
       navigation.replace('(tabs)');
     } catch (error: any) {
       setErrorMsg(error.message || 'Invalid or expired code. Please try again.');

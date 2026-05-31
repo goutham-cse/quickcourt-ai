@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,7 +19,6 @@ export default function LoginScreen({ navigation }: any) {
   const [successMsg, setSuccessMsg] = useState('');
 
   const handleSendOTP = async () => {
-    // Basic validation
     const cleanedEmail = email.trim().toLowerCase();
     if (!cleanedEmail || !cleanedEmail.includes('@')) {
       setErrorMsg('Please enter a valid email address');
@@ -32,22 +30,19 @@ export default function LoginScreen({ navigation }: any) {
     setSuccessMsg('');
 
     try {
-      // 1. Request the One-Time Password / Magic Token from Supabase
+      // Request the One-Time Password from Supabase
       const { error } = await supabase.auth.signInWithOtp({
         email: cleanedEmail,
       });
 
       if (error) throw error;
 
-      // 2. CRITICAL: Save the exact email to local device memory
-      await AsyncStorage.setItem('user_testing_email', cleanedEmail);
-
       setSuccessMsg('Verification code sent successfully!');
       
-      // 3. Move forward to the OTP validation screen immediately
+      // Navigate immediately and pass the email string inline
       setTimeout(() => {
         navigation.navigate('otp', { email: cleanedEmail });
-      }, 800);
+      }, 500);
 
     } catch (error: any) {
       setErrorMsg(error.message || 'Failed to send verification code. Try again.');
@@ -63,16 +58,13 @@ export default function LoginScreen({ navigation }: any) {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer} bounces={false}>
         <View style={styles.card}>
-          {/* Brand/App Title */}
           <Text style={styles.brandTitle}>QuickCourt AI</Text>
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Enter your email to receive a secure 6-digit login code</Text>
 
-          {/* Feedback Messages */}
           {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
           {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
 
-          {/* Email Input Field Box */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Email Address</Text>
             <TextInput
@@ -88,7 +80,6 @@ export default function LoginScreen({ navigation }: any) {
             />
           </View>
 
-          {/* Action Trigger Button */}
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.disabledButton]}
             onPress={handleSendOTP}
@@ -110,7 +101,7 @@ export default function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a', // Deep midnight background
+    backgroundColor: '#0f172a',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -118,7 +109,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   card: {
-    backgroundColor: '#1e293b', // Lighter container gray box layer
+    backgroundColor: '#1e293b',
     borderRadius: 16,
     padding: 28,
     borderWidth: 1,
@@ -132,7 +123,7 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#10b981', // Emerald identity accent
+    color: '#10b981',
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 2,
@@ -141,13 +132,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#ffffff', // Clean white primary text
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
-    color: '#cbd5e1', // High contrast body font styling
+    color: '#cbd5e1',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 28,
@@ -161,7 +152,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#450a0a',
     padding: 12,
     borderRadius: 8,
-    overflow: 'hidden',
   },
   successText: {
     color: '#34d399',
@@ -172,7 +162,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#064e3b',
     padding: 12,
     borderRadius: 8,
-    overflow: 'hidden',
   },
   inputContainer: {
     marginBottom: 24,
@@ -186,17 +175,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#0f172a', // Clean slate embedded block
+    backgroundColor: '#0f172a',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#ffffff', // Ensures user input is perfectly legible
+    color: '#ffffff',
     borderWidth: 2,
     borderColor: '#475569',
   },
   loginButton: {
-    backgroundColor: '#10b981', // Crisp Emerald Green CTA button
+    backgroundColor: '#10b981',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
