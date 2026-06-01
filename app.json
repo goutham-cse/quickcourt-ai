@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "quickcourtai",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -18,9 +17,11 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
+      "package": "com.projects_co.quickcourtai",
       "predictiveBackGestureEnabled": false,
-      "package": "com.projects_co.quickcourtai"
+      
+      "newArchEnabled": true,
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "output": "static",
