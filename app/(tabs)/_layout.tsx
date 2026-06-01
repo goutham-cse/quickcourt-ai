@@ -1,71 +1,20 @@
-import { Tabs } from 'expo-router';
+import { Slot } from 'expo-router';
 import React from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+export default function RootLayout() {
+  // We completely strip out any useEffect redirect rules or context watchers here 
+  // to ensure Expo Router simply displays whatever component is called.
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarActiveTintColor: '#22C55E',
-        tabBarInactiveTintColor: '#9CA3AF',
-      }}>
-      
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol name="house.fill" size={24} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="venues"
-        options={{
-          title: 'Venues',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol name="sportscourt.fill" size={24} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="matches"
-        options={{
-          title: 'Matches',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol name="person.3.fill" size={24} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="ai"
-        options={{
-          title: 'AI',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol name="sparkles" size={24} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol name="person.fill" size={24} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+    <View style={styles.container}>
+      <Slot />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+  },
+});
