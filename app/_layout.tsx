@@ -4,7 +4,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 
 function RootLayoutProtectedState() {
-  const { user, loading } = useAuth();
+  const { session, user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -15,14 +15,14 @@ function RootLayoutProtectedState() {
     const currentPathString = segments.join('/');
     const isInsideAuthScreens = currentPathString.includes('auth');
 
-    if (!user && !isInsideAuthScreens) {
+    if (!session && !isInsideAuthScreens) {
       // Force direct route execution to the login portal screen if unauthenticated
       router.replace('/auth/login');
     } else if (user && isInsideAuthScreens) {
-      // Clear the login layout tree completely and shoot them to the venues home dashboard
-      router.replace('/(tabs)/venues');
+      // Clear the login screen from history and land on the tabs home screen.
+      router.replace('/(tabs)');
     }
-  }, [user, loading, segments]);
+  }, [user, session, loading, segments, router]);
 
   if (loading) {
     return (

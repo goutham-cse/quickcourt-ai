@@ -126,7 +126,7 @@ export default function VenueBookingScreen() {
       <View style={styles.blockCard}>
         <Text style={styles.blockHeader}>Player Feedback Ledger</Text>
         {playerReviews.map(r => (
-          <View key={r.id} style={styles.reviewBubbleItem}><Text style={styles.reviewerName}>👤 {r.player_name} (★ {r.rating}/5)</Text><Text style={styles.reviewComment}>"{r.comment}"</Text></View>
+          <View key={r.id} style={styles.reviewBubbleItem}><Text style={styles.reviewerName}>👤 {r.player_name} (★ {r.rating}/5)</Text><Text style={styles.reviewComment}>{`"${r.comment}"`}</Text></View>
         ))}
       </View>
 

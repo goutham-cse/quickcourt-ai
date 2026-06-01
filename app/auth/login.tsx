@@ -51,6 +51,9 @@ export default function UnifiedLoginScreen() {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: cleanedEmail,
+        options: {
+          shouldCreateUser: true,
+        },
       });
 
       if (error) throw error;
@@ -79,15 +82,14 @@ export default function UnifiedLoginScreen() {
     setSuccessMsg('');
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600)); 
-      
-      // Inject session token directly into Supabase cache manager
-      await supabase.auth.setSession({
-        access_token: 'mock-valid-jwt-token-string-for-quickcourt-dashboard-access',
-        refresh_token: 'mock-valid-refresh-token-string',
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: otp,
+        type: 'email',
       });
-      
-      // Clean redirect to main application layout control
+
+      if (error) throw error;
+
       router.replace('/(tabs)');
     } catch (error: any) {
       setErrorMsg(error.message || 'Invalid or expired code. Please try again.');

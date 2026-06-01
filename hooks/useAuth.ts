@@ -19,5 +19,5 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  return { session, loading };
+  return { session, user: session?.user ?? null, loading };
 }
