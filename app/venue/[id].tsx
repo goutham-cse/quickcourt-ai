@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
 
 const AVAILABLE_HOURS = ['06:00 AM - 07:00 AM', '07:00 AM - 08:00 AM', '04:00 PM - 05:00 PM', '05:00 PM - 06:00 PM', '06:00 PM - 07:00 PM', '07:00 PM - 08:00 PM', '08:00 PM - 09:00 PM'];
+const PAYMENT_QR = require('../../assets/images/payment-qr.jpeg');
 
 interface BookingRecord { id: number; venue_name: string; booking_date: string; time_slot: string; total_price: number; status: string; }
 interface VenueReview { id: number; player_name: string; rating: number; comment: string; }
@@ -26,6 +27,7 @@ export default function VenueBookingScreen() {
 
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [splitCount, setSplitCount] = useState('1'); 
 
   const targetVenueId = id as string;
@@ -60,20 +62,31 @@ export default function VenueBookingScreen() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   }
 
+  function closeRazorpayModal() {
+    setShowRazorpayModal(false);
+    setSelectedPaymentMethod(null);
+  }
+
   async function handleSimulatedPaymentSuccess(methodName: string) {
     try {
       setProcessingPayment(true);
-      await new Promise(res => setTimeout(res, 1800)); // Handshake delay simulation
+      await new Promise(res => setTimeout(res, 1800));
 
-      const { error } = await supabase.from('bookings').insert([{ venue_name: VENUE_NAME, booking_date: '2026-06-01', time_slot: selectedSlot, total_price: PRICE_PER_HOUR, status: `Paid via Razorpay (${methodName}) 🟢` }]);
+      const { error } = await supabase.from('bookings').insert([{ venue_name: VENUE_NAME, booking_date: '2026-06-01', time_slot: selectedSlot, total_price: PRICE_PER_HOUR, status: `Paid via Razorpay (${methodName})` }]);
       if (error) throw error;
 
-      window.alert('🎉 Booking Secured via Razorpay!');
-      setShowRazorpayModal(false); setSelectedSlot(null); setSplitCount('1');
+      Alert.alert('Booking Secured', 'Payment verified through Razorpay mock checkout.');
+      setShowRazorpayModal(false);
+      setSelectedPaymentMethod(null);
+      setSelectedSlot(null);
+      setSplitCount('1');
       syncCompleteEngineState();
-    } catch (err: any) { window.alert(err.message); } finally { setProcessingPayment(false); }
+    } catch (err: any) {
+      Alert.alert('Payment failed', err.message || 'Unable to confirm this payment.');
+    } finally {
+      setProcessingPayment(false);
+    }
   }
-
   async function handlePublishTurfReview() {
     if (!turfFeedbackInput.trim()) return;
     try {
@@ -108,16 +121,53 @@ export default function VenueBookingScreen() {
           ) : (
             <View style={styles.razorpaySheet}>
               <View style={styles.razorpayHeader}>
-                <View><Text style={styles.razorpayBrand}>Razorpay</Text><Text style={styles.razorpayMerchant}>{VENUE_NAME}</Text></View>
-                <TouchableOpacity onPress={() => setShowRazorpayModal(false)}><Text style={styles.razorpayClose}>✕</Text></TouchableOpacity>
+                <View>
+                  <Text style={styles.razorpayBrand}>Razorpay</Text>
+                  <Text style={styles.razorpayMerchant}>{VENUE_NAME}</Text>
+                </View>
+                <TouchableOpacity onPress={closeRazorpayModal}><Text style={styles.razorpayClose}>x</Text></TouchableOpacity>
               </View>
-              <View style={styles.splitBoxInline}>
-                <Text style={styles.splitLabel}>Split Players Count:</Text>
-                <TextInput style={styles.splitInputInline} value={splitCount} onChangeText={setSplitCount} keyboardType="numeric" />
-                <Text style={styles.splitCostDisplay}>Your Share: ₹{perPlayerCost}</Text>
-              </View>
-              <TouchableOpacity style={styles.methodRow} onPress={() => handleSimulatedPaymentSuccess('UPI / GPay')}><Text style={styles.methodTitle}>📱 UPI - Google Pay / PhonePe</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.methodRow} onPress={() => handleSimulatedPaymentSuccess('Card')}><Text style={styles.methodTitle}>💳 Credit / Debit Card</Text></TouchableOpacity>
+
+              {selectedPaymentMethod ? (
+                <View style={styles.qrCheckoutPanel}>
+                  <View style={styles.qrStatusPill}><Text style={styles.qrStatusText}>Secure Razorpay UPI Intent</Text></View>
+                  <View style={styles.qrAmountBox}>
+                    <Text style={styles.qrAmountLabel}>Amount payable</Text>
+                    <Text style={styles.qrAmountValue}>Rs. {perPlayerCost}</Text>
+                    <Text style={styles.qrAmountMeta}>{selectedPaymentMethod}  |  Split {parsedSplits} player{parsedSplits > 1 ? 's' : ''}</Text>
+                  </View>
+                  <View style={styles.qrFrame}>
+                    <View style={styles.qrCornerTopLeft} />
+                    <View style={styles.qrCornerTopRight} />
+                    <Image source={PAYMENT_QR} style={styles.qrImage} resizeMode="contain" />
+                    <View style={styles.qrCornerBottomLeft} />
+                    <View style={styles.qrCornerBottomRight} />
+                  </View>
+                  <Text style={styles.qrInstruction}>Scan this QR with any UPI app. After the transaction succeeds, tap Payment Done to confirm your booking.</Text>
+                  <View style={styles.qrActionRow}>
+                    <TouchableOpacity style={styles.secondaryPaymentBtn} onPress={() => setSelectedPaymentMethod(null)}>
+                      <Text style={styles.secondaryPaymentText}>Change Method</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.primaryPaymentBtn} onPress={() => handleSimulatedPaymentSuccess(selectedPaymentMethod)}>
+                      <Text style={styles.primaryPaymentText}>Payment Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.splitBoxInline}>
+                    <Text style={styles.splitLabel}>Split Players Count:</Text>
+                    <TextInput style={styles.splitInputInline} value={splitCount} onChangeText={setSplitCount} keyboardType="numeric" />
+                    <Text style={styles.splitCostDisplay}>Your Share: Rs. {perPlayerCost}</Text>
+                  </View>
+                  <View style={styles.gatewayFrame}>
+                    <Text style={styles.gatewayTitle}>Choose Razorpay payment method</Text>
+                    <Text style={styles.gatewaySubtitle}>A secure QR checkout will open for confirmation.</Text>
+                    <TouchableOpacity style={styles.methodRow} onPress={() => setSelectedPaymentMethod('UPI / GPay')}><Text style={styles.methodTitle}>UPI - Google Pay / PhonePe</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.methodRow} onPress={() => setSelectedPaymentMethod('Card')}><Text style={styles.methodTitle}>Credit / Debit Card</Text></TouchableOpacity>
+                  </View>
+                </>
+              )}
             </View>
           )}
         </View>
@@ -176,8 +226,30 @@ const styles = StyleSheet.create({
   splitLabel: { fontSize: 12, color: '#475569', fontWeight: '600' },
   splitInputInline: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, padding: 4, width: 45, fontSize: 12, textAlign: 'center' },
   splitCostDisplay: { fontSize: 12, color: '#059669', marginLeft: 'auto', fontWeight: '700' },
+  gatewayFrame: { backgroundColor: '#f8fbff', borderWidth: 1, borderColor: '#bfdbfe', borderRadius: 12, padding: 12 },
+  gatewayTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a', marginBottom: 3 },
+  gatewaySubtitle: { fontSize: 12, color: '#64748b', marginBottom: 12 },
   methodRow: { padding: 14, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10, marginBottom: 10 },
   methodTitle: { fontSize: 13, fontWeight: '700', color: '#1e293b' },
+  qrCheckoutPanel: { backgroundColor: '#f8fbff', borderWidth: 1, borderColor: '#bfdbfe', borderRadius: 14, padding: 14, alignItems: 'center' },
+  qrStatusPill: { backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, marginBottom: 12 },
+  qrStatusText: { color: '#0369a1', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  qrAmountBox: { width: '100%', backgroundColor: '#0f172a', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 14 },
+  qrAmountLabel: { color: '#cbd5e1', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  qrAmountValue: { color: '#ffffff', fontSize: 28, fontWeight: '900', marginTop: 2 },
+  qrAmountMeta: { color: '#93c5fd', fontSize: 12, marginTop: 3, fontWeight: '600' },
+  qrFrame: { width: '86%', maxWidth: 300, aspectRatio: 1, backgroundColor: '#ffffff', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#dbeafe', shadowColor: '#0f172a', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6, position: 'relative', marginBottom: 14 },
+  qrImage: { width: '100%', height: '100%', borderRadius: 8 },
+  qrCornerTopLeft: { position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderTopWidth: 3, borderLeftWidth: 3, borderColor: '#3399cc', borderTopLeftRadius: 10, zIndex: 1 },
+  qrCornerTopRight: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderTopWidth: 3, borderRightWidth: 3, borderColor: '#3399cc', borderTopRightRadius: 10, zIndex: 1 },
+  qrCornerBottomLeft: { position: 'absolute', bottom: 8, left: 8, width: 28, height: 28, borderBottomWidth: 3, borderLeftWidth: 3, borderColor: '#3399cc', borderBottomLeftRadius: 10, zIndex: 1 },
+  qrCornerBottomRight: { position: 'absolute', bottom: 8, right: 8, width: 28, height: 28, borderBottomWidth: 3, borderRightWidth: 3, borderColor: '#3399cc', borderBottomRightRadius: 10, zIndex: 1 },
+  qrInstruction: { fontSize: 12, color: '#475569', textAlign: 'center', lineHeight: 17, marginBottom: 14 },
+  qrActionRow: { flexDirection: 'row', gap: 10, width: '100%' },
+  secondaryPaymentBtn: { flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingVertical: 12, alignItems: 'center', backgroundColor: '#ffffff' },
+  secondaryPaymentText: { color: '#334155', fontSize: 12, fontWeight: '800' },
+  primaryPaymentBtn: { flex: 1, backgroundColor: '#3399cc', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  primaryPaymentText: { color: '#ffffff', fontSize: 12, fontWeight: '900' },
   razorpayLoaderBox: { backgroundColor: '#fff', padding: 30, borderRadius: 12, alignItems: 'center', width: '90%' },
   razorpayLoaderText: { fontSize: 13, fontWeight: 'bold', color: '#1e293b', marginTop: 14 },
   reviewBubbleItem: { backgroundColor: '#f8fafc', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 10 },
